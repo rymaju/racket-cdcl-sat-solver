@@ -9,6 +9,11 @@
       (literal (string->symbol (format "var-~a" (abs integer))) (positive? integer)))))
 
 
+(define (simp-dimacs->cnf/gensym dimacs)
+  (for/list ([clause (in-list dimacs)])
+    (for/list ([integer (in-list clause)])
+      (literal (gensym (format "var-~a" (abs integer))) (positive? integer)))))
+
 (module+ test
   (check-equal? (simp-dimacs->cnf '((1 2) (-2 3)))
                 (list (list (literal 'var-1 #t) (literal 'var-2 #t))
@@ -119,13 +124,13 @@
   )
 
 
-(define (file->cnf path)
+(define (file->cnf path (use-gensym #t))
   (define zero-ended-clauses (cdr (file->lines path)))
 
   (define simp-dimacs
     (for/list ([dimacs-cls-str (in-list zero-ended-clauses)])
       (map string->number (drop-right (string-split dimacs-cls-str) 1))))
-  (simp-dimacs->cnf simp-dimacs))
+  ((if use-gensym simp-dimacs->cnf/gensym simp-dimacs->cnf) simp-dimacs))
 
 (require racket/sandbox)
 
