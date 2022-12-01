@@ -7,7 +7,8 @@
   (struct-copy literal l [phase (not (literal-phase l))]))
 
 (define (choose ls)
-  (list-ref ls (random (length ls))))
+  (cond [(vector? ls) (vector-ref ls (random (vector-length ls)))]
+        [(list? ls) (list-ref ls (random (length ls)))]))
 
 (module+ test
   (check-equal? (negate-literal (literal 'var-1 #t))
@@ -21,31 +22,38 @@
   (length a))
 
 (define (dpll cnf0 [assignment (empty-assignment)])
+  (dpll^ (list->vector cnf0) assignment))
+
+(define (dpll^ cnf0 [assignment (empty-assignment)])
   (define cnf (if (cons? assignment) (simplify cnf0 (car assignment)) cnf0))
-  (cond [(ormap empty? cnf) #f]
+  (cond [(contains-empty-clause? cnf) #f]
         [(contains-unit-clause? cnf)
-         => (lambda (unit-lit) (dpll cnf (extend-assignment assignment unit-lit)))]
-        [(or (= (assignment-size assignment) (length cnf)) (empty? cnf)) #t]
+         => (lambda (unit-lit) (dpll^ cnf (extend-assignment assignment unit-lit)))]
+        [(or (= (assignment-size assignment) (vector-length cnf)) (vector-empty? cnf)) #t]
         [else (choose-literal-and-recur cnf assignment)]))
 
 (define (simplify cnf next-literal)
-  (for/list ([clause (in-list cnf)]
+  (for/vector ([clause (in-vector cnf)]
              #:unless (clause-contains? clause next-literal))
     (remove (negate-literal next-literal) clause)))
 
 (define (clause-contains? clause lit)
   (member lit clause))
 
+(define (contains-empty-clause? cnf)
+  (for/or ([clause (in-vector cnf)])
+    (empty? clause)))
+
 (define (contains-unit-clause? cnf)
-  (for/or ([clause (in-list cnf)])
+  (for/or ([clause (in-vector cnf)])
     (and (= (length clause) 1) (car clause))))
 
 
 
 (define (choose-literal-and-recur cnf assignment)
   (define l (choose-literal cnf))
-  (or (dpll cnf (extend-assignment assignment l))
-      (dpll cnf (extend-assignment assignment (negate-literal l)))))
+  (or (dpll^ cnf (extend-assignment assignment l))
+      (dpll^ cnf (extend-assignment assignment (negate-literal l)))))
 
 (define (choose-literal cnf)
   (choose (choose cnf)))
@@ -55,8 +63,6 @@
   (for/list ([clause (in-list dimacs)])
     (for/list ([integer (in-list clause)])
       (literal (string->symbol (format "var-~a" (abs integer))) (positive? integer)))))
-
-(define CNF-SAT-1 (simp-dimacs->cnf '((1 2) (-2 3))))
 
 
 (module+ test
@@ -141,7 +147,6 @@
   (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
   (check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
   (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
-  (displayln "Results same")
   (for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
     (check-equal? (dpll test) (rosette-sat? test)))
