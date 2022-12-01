@@ -1,62 +1,6 @@
 #lang racket
+(require "solver.rkt" "utils.rkt")
 (module+ test (require rackunit))
-
-(struct literal [symbol phase] #:transparent)
-
-(define  (negate-literal l)
-  (struct-copy literal l [phase (not (literal-phase l))]))
-
-(define (choose ls)
-  (cond [(vector? ls) (vector-ref ls (random (vector-length ls)))]
-        [(list? ls) (list-ref ls (random (length ls)))]))
-
-(module+ test
-  (check-equal? (negate-literal (literal 'var-1 #t))
-                (literal 'var-1 #f)))
-
-
-(define (empty-assignment) (list))
-(define (extend-assignment a lit)
-  (cons lit a))
-(define (assignment-size a)
-  (length a))
-
-(define (dpll cnf0 [assignment (empty-assignment)])
-  (dpll^ (list->vector cnf0) assignment))
-
-(define (dpll^ cnf0 [assignment (empty-assignment)])
-  (define cnf (if (cons? assignment) (simplify cnf0 (car assignment)) cnf0))
-  (cond [(contains-empty-clause? cnf) #f]
-        [(contains-unit-clause? cnf)
-         => (lambda (unit-lit) (dpll^ cnf (extend-assignment assignment unit-lit)))]
-        [(or (= (assignment-size assignment) (vector-length cnf)) (vector-empty? cnf)) #t]
-        [else (choose-literal-and-recur cnf assignment)]))
-
-(define (simplify cnf next-literal)
-  (for/vector ([clause (in-vector cnf)]
-             #:unless (clause-contains? clause next-literal))
-    (remove (negate-literal next-literal) clause)))
-
-(define (clause-contains? clause lit)
-  (member lit clause))
-
-(define (contains-empty-clause? cnf)
-  (for/or ([clause (in-vector cnf)])
-    (empty? clause)))
-
-(define (contains-unit-clause? cnf)
-  (for/or ([clause (in-vector cnf)])
-    (and (= (length clause) 1) (car clause))))
-
-
-
-(define (choose-literal-and-recur cnf assignment)
-  (define l (choose-literal cnf))
-  (or (dpll^ cnf (extend-assignment assignment l))
-      (dpll^ cnf (extend-assignment assignment (negate-literal l)))))
-
-(define (choose-literal cnf)
-  (choose (choose cnf)))
 
 ;; takes a simplified dimacs (without header or ending zero) and converts it into our literals
 (define (simp-dimacs->cnf dimacs)
@@ -85,11 +29,10 @@
   `(begin (require rosette)
           (define-symbolic ,@all-vars boolean?)
           (define sol (solve (assert (and ,@(for/list ([clause (in-list cnf)])
-                                  `(or ,@(for/list ([lit (in-list clause)])
-                                           (if (literal-phase lit)
-                                               (literal-symbol lit)
-                                               `(not ,(literal-symbol lit))))))))))
-          ;(displayln (complete-solution sol (list ,@all-vars)))
+                                              `(or ,@(for/list ([lit (in-list clause)])
+                                                       (if (literal-phase lit)
+                                                           (literal-symbol lit)
+                                                           `(not ,(literal-symbol lit))))))))))
           (sat? sol)))
 
 (module+ test
@@ -191,3 +134,13 @@
       (if (= (random 2) 0)
           (add1 (random 100))
           (- -1 (random 100))))))
+
+(require profile profile/render-graphviz)
+(define (run-profiler)
+  (profile (time-on-chosen-benchmarks (list dpll))
+           #:delay 0.0001
+           #:repeat 2
+           #:render render
+           #:use-errortrace? #t))
+
+;(run-profiler)
