@@ -20,7 +20,8 @@
   (eval (rosette-compile cnf)))
 
 (module+ test
-  (check-true (rosette-sat? (simp-dimacs->cnf '((1 2) (-2 3))))))
+  ;(check-true (rosette-sat? (simp-dimacs->cnf '((1 2) (-2 3)))))
+  )
 
 ;; Compiles CNF into a quoted racket expression to `eval`
 ;; Uses rosette to determine if CNF is SAT
@@ -94,26 +95,26 @@
 
 
 
-  (check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
+  ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
   (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
 
-  (check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
+  ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
   (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
 
-  (check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
+  ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
   (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
 
-  (check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+  ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
   (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2)))
 
   #;(for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
     (check-equal? (dpll test) (rosette-sat? test)))
 
-  (displayln "Time for DPLL on true random:")
-  (time   (dpll (simp-dimacs->cnf (gen-random-case 42 20000 10))))
+  ;(displayln "Time for DPLL on true random:")
+  ;(time   (dpll (simp-dimacs->cnf (gen-random-case 42 20000 10))))
 
-  (check-true (time-on-chosen-benchmarks (list dpll))))
+  (time-on-chosen-benchmarks  dpll))
 
 
 (define (file->cnf path)
@@ -124,23 +125,21 @@
       (map string->number (drop-right (string-split dimacs-cls-str) 1))))
   (simp-dimacs->cnf simp-dimacs))
 
-(define (time-on-chosen-benchmarks solver*)
+(require racket/sandbox)
+(define (time-on-chosen-benchmarks solver)
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
-                  ;"./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
-                  ;"./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
-                  ;"./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
+                  "./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
+                  "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
+                  "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
                   ))
-  (for/and ([path (in-list paths)])
-    (displayln (format "--- START Test ~a ---" path))
-    (define results
-      (for/list ([solver (in-list solver*)]
-                 [idx (in-naturals)])
-        (displayln (format "Solver ~a:" idx))
-        (time (solver (file->cnf path)))))
-     (displayln (format "--- END Test ~a ---" path))
-    (or (<= (length results) 1) (apply equal? results))))
+  (for ([path (in-list paths)]
+            [idx (in-naturals)])
+    (displayln (format "--- START Test ~a ---" idx))
+
+    (with-handlers ([exn:fail? (λ (e) (displayln "Timed out!"))])
+      (with-deep-time-limit 3 (time (solver (file->cnf path)))))))
 
 
 (define (gen-random-case seed nclauses csize)
