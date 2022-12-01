@@ -1,4 +1,4 @@
-#lang racket
+#lang errortrace racket
 (require "utils.rkt" "solver.rkt")
 (module+ test (require rackunit))
 
@@ -47,7 +47,7 @@
 
 
 (module+ test
-
+  (require rackunit/text-ui)
   (define DIMACS-SAT-1
     '((1 2)
       (-2 -4)
@@ -94,27 +94,29 @@
   (define DIMACS-UNSAT-2 '((-1) (1)))
 
 
+  (define-test-suite basic-correctness
+    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
+    (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
 
-  ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
-  (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
+    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
+    (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
 
-  ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
-  (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
+    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
+    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
 
-  ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
-  (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
-
-  ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
-  (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2))))
 
   #;(for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
     (check-equal? (dpll test) (rosette-sat? test)))
 
-  ;(displayln "Time for DPLL on true random:")
-  ;(time   (dpll (simp-dimacs->cnf (gen-random-case 42 20000 10))))
+  (displayln "Time for DPLL on true random:")
+  (time   (dpll (simp-dimacs->cnf (gen-random-case 42 20000 10))))
 
-  (time-on-chosen-benchmarks  dpll))
+  (run-tests basic-correctness)
+  (time-on-chosen-benchmarks dpll)
+  )
 
 
 (define (file->cnf path)
@@ -126,7 +128,12 @@
   (simp-dimacs->cnf simp-dimacs))
 
 (require racket/sandbox)
-(define (time-on-chosen-benchmarks solver)
+
+(define profiling-paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
+                  "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
+                  "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
+                  ))
+(define (time-on-chosen-benchmarks solver (timeout 60))
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
@@ -134,12 +141,12 @@
                   "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
                   "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
                   ))
-  (for ([path (in-list paths)]
+  (for/and ([path (in-list paths)]
             [idx (in-naturals)])
     (displayln (format "--- START Test ~a ---" idx))
 
-    (with-handlers ([exn:fail? (λ (e) (displayln "Timed out!"))])
-      (with-deep-time-limit 3 (time (solver (file->cnf path)))))))
+    (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
+      (with-deep-time-limit timeout (time (solver (file->cnf path)))))))
 
 
 (define (gen-random-case seed nclauses csize)
@@ -149,3 +156,14 @@
       (if (= (random 2) 0)
           (add1 (random 100))
           (- -1 (random 100))))))
+
+(require profile profile/render-graphviz)
+(define (run-profiler)
+  (define tests (for/list ([path (in-list profiling-paths)])  (file->cnf path)))
+  (profile (for ([test (in-list tests)])
+             (dpll test))
+           #:delay 0.001
+           #:repeat 5
+           #:render render
+           #:use-errortrace? #t))
+;(run-profiler)
