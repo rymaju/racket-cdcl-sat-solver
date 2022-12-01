@@ -1,9 +1,8 @@
-#lang errortrace racket
+#lang racket
 (require (prefix-in ra: data/ralist) "utils.rkt")
 
 (provide dpll)
 
-;; Tombstone
 (define REMOVED-CLAUSE 'REMOVED-CLAUSE)
 (define (removed-clause? e) (equal? REMOVED-CLAUSE e))
 
@@ -14,10 +13,12 @@
   (dpll^ cnf assignment watched-literals unused-vars))
 
 (define (dpll^ cnf0 assignment watched-literals unused-vars)
-  (define cnf (if (cons? assignment) (simplify cnf0 (car assignment) watched-literals) cnf0))
+  (define-values (cnf maybe-unit-literal)
+    (if (cons? assignment)
+        (simplify cnf0 (car assignment) watched-literals)
+        (values cnf0 #f)))
   (cond [(found-empty-clause? cnf) #f]
-        [(contains-unit-clause? cnf)
-         => (lambda (unit-lit) (dpll^ cnf (extend-assignment assignment unit-lit) watched-literals unused-vars))]
+        [maybe-unit-literal => (lambda (unit-lit) (dpll^ cnf (extend-assignment assignment unit-lit) watched-literals unused-vars))]
         [(set-empty? unused-vars) #t]
         [else (choose-literal-and-recur cnf assignment watched-literals unused-vars)]))
 
@@ -26,17 +27,26 @@
   (equal? FOUND-EMPTY-CLAUSE cnf))
 
 (define (simplify cnf next-literal watched-literals)
-  (for/fold ([simplified cnf])
+  (for/fold ([simplified cnf]
+             [next-unit-propagate #f])
             ([clause-idx (in-set (hash-ref watched-literals (literal-symbol next-literal)))]
              #:break (found-empty-clause? simplified)
              #:do [(define clause (formula-ref cnf clause-idx))])
-    (cond [(removed-clause? clause) simplified]
-          [(clause-contains? clause next-literal) (formula-set simplified clause-idx REMOVED-CLAUSE)]
+    (cond [(removed-clause? clause) (values simplified next-unit-propagate)]
+          [(clause-contains? clause next-literal)
+           (values
+            (formula-set simplified clause-idx REMOVED-CLAUSE)
+            next-unit-propagate)]
           [else
            (define clause^ (remove (negate-literal next-literal) clause))
-           (if (empty? clause^)
-               'FOUND-EMPTY-CLAUSE
-               (formula-set simplified clause-idx clause^))])))
+           (cond [(empty? clause^)
+                  (values 'FOUND-EMPTY-CLAUSE
+                          next-unit-propagate)]
+                 [(empty? (cdr clause^))
+                  (values (formula-set simplified clause-idx clause^)
+                          (car clause^))]
+                 [else (values (formula-set simplified clause-idx clause^)
+                               next-unit-propagate)])])))
 
 
 (define (choose-literal-and-recur cnf assignment watched-literals unused-vars)

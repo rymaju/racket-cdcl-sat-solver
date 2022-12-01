@@ -133,7 +133,7 @@
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
                   ))
-(define (time-on-chosen-benchmarks solver (timeout 60))
+(define (time-on-chosen-benchmarks solver (timeout 5))
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
@@ -145,8 +145,8 @@
             [idx (in-naturals)])
     (displayln (format "--- START Test ~a ---" idx))
 
-    (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
-      (with-deep-time-limit timeout (time (solver (file->cnf path)))))))
+    (time (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
+      (with-deep-time-limit timeout (solver (file->cnf path)))))))
 
 
 (define (gen-random-case seed nclauses csize)
