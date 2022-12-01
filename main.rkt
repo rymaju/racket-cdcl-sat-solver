@@ -1,62 +1,6 @@
 #lang racket
+(require "utils.rkt" "solver.rkt")
 (module+ test (require rackunit))
-
-(struct literal [symbol phase] #:transparent)
-
-(define  (negate-literal l)
-  (struct-copy literal l [phase (not (literal-phase l))]))
-
-(define (choose ls)
-  (cond [(vector? ls) (vector-ref ls (random (vector-length ls)))]
-        [(list? ls) (list-ref ls (random (length ls)))]))
-
-(module+ test
-  (check-equal? (negate-literal (literal 'var-1 #t))
-                (literal 'var-1 #f)))
-
-
-(define (empty-assignment) (list))
-(define (extend-assignment a lit)
-  (cons lit a))
-(define (assignment-size a)
-  (length a))
-
-(define (dpll cnf0 [assignment (empty-assignment)])
-  (dpll^ (list->vector cnf0) assignment))
-
-(define (dpll^ cnf0 [assignment (empty-assignment)])
-  (define cnf (if (cons? assignment) (simplify cnf0 (car assignment)) cnf0))
-  (cond [(contains-empty-clause? cnf) #f]
-        [(contains-unit-clause? cnf)
-         => (lambda (unit-lit) (dpll^ cnf (extend-assignment assignment unit-lit)))]
-        [(or (= (assignment-size assignment) (vector-length cnf)) (vector-empty? cnf)) #t]
-        [else (choose-literal-and-recur cnf assignment)]))
-
-(define (simplify cnf next-literal)
-  (for/vector ([clause (in-vector cnf)]
-             #:unless (clause-contains? clause next-literal))
-    (remove (negate-literal next-literal) clause)))
-
-(define (clause-contains? clause lit)
-  (member lit clause))
-
-(define (contains-empty-clause? cnf)
-  (for/or ([clause (in-vector cnf)])
-    (empty? clause)))
-
-(define (contains-unit-clause? cnf)
-  (for/or ([clause (in-vector cnf)])
-    (and (= (length clause) 1) (car clause))))
-
-
-
-(define (choose-literal-and-recur cnf assignment)
-  (define l (choose-literal cnf))
-  (or (dpll^ cnf (extend-assignment assignment l))
-      (dpll^ cnf (extend-assignment assignment (negate-literal l)))))
-
-(define (choose-literal cnf)
-  (choose (choose cnf)))
 
 ;; takes a simplified dimacs (without header or ending zero) and converts it into our literals
 (define (simp-dimacs->cnf dimacs)
@@ -102,6 +46,7 @@
 
 
 (module+ test
+
   (define DIMACS-SAT-1
     '((1 2)
       (-2 -4)
@@ -121,6 +66,7 @@
       (13 14)
       (14 -15)
       (15 16)))
+  (define DIMACS-SAT-2 '((1 2) (-2 3)))
 
   (define DIMACS-UNSAT-1
     '((1 2)
@@ -143,11 +89,24 @@
       (15 16)
       (-2)
       (2)))
+
+  (define DIMACS-UNSAT-2 '((-1) (1)))
+
+
+
   (check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
   (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
+
+  (check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
+  (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
+
   (check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
   (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
-  (for ([i (in-range 10)])
+
+  (check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+  (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+
+  #;(for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
     (check-equal? (dpll test) (rosette-sat? test)))
 
