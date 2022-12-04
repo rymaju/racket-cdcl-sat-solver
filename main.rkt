@@ -73,6 +73,12 @@
       (14 -15)
       (15 16)))
   (define DIMACS-SAT-2 '((1 2) (-2 3)))
+  (define DIMACS-SAT-3 '((1 2 3 4 5)
+(-1 -2 -3 -4 -5)
+(1 -2)
+(3 -4 5)
+(5)
+(-1 2) ))
 
   (define DIMACS-UNSAT-1
     '((1 2)
@@ -100,17 +106,20 @@
 
 
   (define-test-suite basic-correctness
-    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
+    (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-3)))
+    ;; ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
     (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
 
-    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
+    ;; ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
     (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
 
-    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
+    ;; ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
     (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
 
-    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
-    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2))))
+    ;; ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    )
+
 
   #;(for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
@@ -134,10 +143,17 @@
 
 (require racket/sandbox)
 
-(define profiling-paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
+(define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
+                  "./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
+                  "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
+                  "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
+                  "./chosen-benchmarks/4ef35e8c7b387e8c2fff1f552a04e3a2-LABS_n068_goal001.cnf"
+                  "./chosen-benchmarks/5a9ce84a8725164c40c90d2eb420bad9-sted5_0x0_n90-157.cnf"
+                  "./chosen-benchmarks/5c34b6844ed6a3fc57dccfc414af2851-SC21_Timetable_C_136_E_36_Cl_9_S_15.cnf"
                   ))
+(define profiling-paths (take paths 6))
 (define (time-on-chosen-benchmarks solver (timeout 5))
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
@@ -145,8 +161,11 @@
                   "./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
                   "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
                   "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
+                  "./chosen-benchmarks/4ef35e8c7b387e8c2fff1f552a04e3a2-LABS_n068_goal001.cnf"
+                  "./chosen-benchmarks/5a9ce84a8725164c40c90d2eb420bad9-sted5_0x0_n90-157.cnf"
+                  "./chosen-benchmarks/5c34b6844ed6a3fc57dccfc414af2851-SC21_Timetable_C_136_E_36_Cl_9_S_15.cnf"
                   ))
-  (for/and ([path (in-list paths)]
+  (for ([path (in-list paths)]
             [idx (in-naturals)])
     (displayln (format "--- START Test ~a ---" idx))
 
@@ -171,4 +190,7 @@
            #:repeat 5
            #:render render
            #:use-errortrace? #t))
-;(run-profiler)
+(run-profiler)
+;(define tests (for/list ([path (in-list profiling-paths)])  (file->cnf path)))
+#;(for ([test (in-list tests)])
+             (dpll test))

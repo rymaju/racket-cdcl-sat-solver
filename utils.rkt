@@ -22,3 +22,8 @@
   (cons lit a))
 (define (assignment-size a)
   (length a))
+
+(define (literal-positive var)
+  (literal var #t))
+(define (literal-negative var)
+  (literal var #f))
