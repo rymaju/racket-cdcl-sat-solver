@@ -32,7 +32,11 @@
         (simplify* cnf (car assignment0) watched-literals assignment0 unused-vars)
         (values #f watched-literals assignment0 unused-vars)))
 
-  (cond [found-empty-clause #f]
+  (cond [found-empty-clause
+         (define-values (maybe-resolved-assignment maybe-unused-vars)
+           (attempt-to-resolve-conlict found-empty-clause assignment watched-literals+ assignment unused-vars+))
+         (and maybe-resolved-assignment
+              (dpll^ cnf maybe-resolved-assignment watched-literals maybe-unused-vars))]
         [(set-empty? unused-vars) #t]
         [else (choose-literal-and-recur cnf assignment watched-literals+ unused-vars+)]))
 
@@ -100,24 +104,10 @@
            ;; (displayln clause)
            ;; (displayln (map (curryr literal-value assignment) clause))
            ;; (displayln assignment)
-           (values #t watched-literals  next-unit-propagate*)])
+           (values clause watched-literals  next-unit-propagate*)])
 
 
-    #;(cond [(removed-clause? clause) (values simplified next-unit-propagate)] ;; skip basically
-          [(clause-contains? clause next-literal)
-           (values
-            (formula-set simplified clause-idx REMOVED-CLAUSE)
-            next-unit-propagate)]
-          [else
-           (define clause^ (remove (negate-literal next-literal) clause))
-           (cond [(empty? clause^)
-                  (values 'FOUND-EMPTY-CLAUSE
-                          next-unit-propagate)]
-                 [(empty? (cdr clause^))
-                  (values (formula-set simplified clause-idx clause^)
-                          (car clause^))]
-                 [else (values (formula-set simplified clause-idx clause^)
-                               next-unit-propagate)])])))
+    ))
 
 
 (define (choose-literal-and-recur cnf assignment watched-literals unused-vars)
@@ -134,14 +124,7 @@
 (define (clause-contains? clause lit)
   (member lit clause))
 
-(define (contains-empty-clause? cnf)
-  (for/or ([clause (ra:in-list cnf)])
-    (empty? clause)))
 
-(define (contains-unit-clause? cnf)
-  (for/first ([clause (ra:in-list cnf)]
-              #:when (and (cons? clause) (= (length clause) 1)))
-     (car clause)))
 
 
 (define (choose-literal cnf)
@@ -199,4 +182,11 @@
   (check-equal?  (literal-value (literal 'x #t) '()) 'undefined)
   (check-equal?  (literal-value (literal 'x #t) (list (literal 'x #t))) #t)
   (check-equal?  (literal-value (literal 'x #t) (list (literal 'x #f))) #f)
+  )
+
+;; -> Assignment (Setof Symbol)
+(define (attempt-to-resolve-conflict conflict-clause assignment)
+  ;; TODO:
+  ;; -
+
   )

@@ -154,6 +154,7 @@
                   "./chosen-benchmarks/5c34b6844ed6a3fc57dccfc414af2851-SC21_Timetable_C_136_E_36_Cl_9_S_15.cnf"
                   ))
 (define profiling-paths (take paths 6))
+
 (define (time-on-chosen-benchmarks solver (timeout 5))
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
@@ -168,7 +169,7 @@
   (for ([path (in-list paths)]
             [idx (in-naturals)])
     (displayln (format "--- START Test ~a ---" idx))
-
+    (time )
     (time (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
       (with-deep-time-limit timeout (solver (file->cnf path)))))))
 
