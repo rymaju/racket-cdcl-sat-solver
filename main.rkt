@@ -9,6 +9,11 @@
       (literal (string->symbol (format "var-~a" (abs integer))) (positive? integer)))))
 
 
+(define (simp-dimacs->cnf/gensym dimacs)
+  (for/list ([clause (in-list dimacs)])
+    (for/list ([integer (in-list clause)])
+      (literal (gensym (format "var-~a" (abs integer))) (positive? integer)))))
+
 (module+ test
   (check-equal? (simp-dimacs->cnf '((1 2) (-2 3)))
                 (list (list (literal 'var-1 #t) (literal 'var-2 #t))
@@ -68,6 +73,12 @@
       (14 -15)
       (15 16)))
   (define DIMACS-SAT-2 '((1 2) (-2 3)))
+  (define DIMACS-SAT-3 '((1 2 3 4 5)
+(-1 -2 -3 -4 -5)
+(1 -2)
+(3 -4 5)
+(5)
+(-1 2) ))
 
   (define DIMACS-UNSAT-1
     '((1 2)
@@ -95,17 +106,20 @@
 
 
   (define-test-suite basic-correctness
-    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
+    (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-3)))
+    ;; ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-1)))
     (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-1)))
 
-    ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
+    ;; ;(check-true (rosette-sat? (simp-dimacs->cnf DIMACS-SAT-2)))
     (check-true (dpll (simp-dimacs->cnf DIMACS-SAT-2)))
 
-    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
+    ;; ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-1)))
     (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-1)))
 
-    ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
-    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2))))
+    ;; ;(check-false (rosette-sat? (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    (check-false (dpll (simp-dimacs->cnf  DIMACS-UNSAT-2)))
+    )
+
 
   #;(for ([i (in-range 10)])
     (define test (simp-dimacs->cnf (gen-random-case i 100 10)))
@@ -119,34 +133,44 @@
   )
 
 
-(define (file->cnf path)
+(define (file->cnf path (use-gensym #t))
   (define zero-ended-clauses (cdr (file->lines path)))
 
   (define simp-dimacs
     (for/list ([dimacs-cls-str (in-list zero-ended-clauses)])
       (map string->number (drop-right (string-split dimacs-cls-str) 1))))
-  (simp-dimacs->cnf simp-dimacs))
+  ((if use-gensym simp-dimacs->cnf/gensym simp-dimacs->cnf) simp-dimacs))
 
 (require racket/sandbox)
 
-(define profiling-paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
+(define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
+                  "./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
+                  "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
+                  "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
+                  "./chosen-benchmarks/4ef35e8c7b387e8c2fff1f552a04e3a2-LABS_n068_goal001.cnf"
+                  "./chosen-benchmarks/5a9ce84a8725164c40c90d2eb420bad9-sted5_0x0_n90-157.cnf"
+                  "./chosen-benchmarks/5c34b6844ed6a3fc57dccfc414af2851-SC21_Timetable_C_136_E_36_Cl_9_S_15.cnf"
                   ))
-(define (time-on-chosen-benchmarks solver (timeout 60))
+(define profiling-paths (take paths 6))
+(define (time-on-chosen-benchmarks solver (timeout 5))
   (define paths '("./chosen-benchmarks/9a296539e33398c9ae36663371a63b39-randomG-Mix-n17-d05.cnf"
                   "./chosen-benchmarks/951a20a37a23488001f3aa2fa53e6baa-randomG-n16-d05.cnf"
                   "./chosen-benchmarks/1527378fc216e0506bf8b63d0fad56be-randomG-Mix-n18-d05.cnf"
                   "./chosen-benchmarks/d5453d6d31f33a310ce34ee4bcfcbe50-prime_a24_b24.cnf"
                   "./chosen-benchmarks/50468d740d0d9cd69c43e4122014d60e-sted6_0x1e3-97.cnf"
                   "./chosen-benchmarks/c1484d43c95d76184dbe50ac5fc98854-satch2ways17w.cnf"
+                  "./chosen-benchmarks/4ef35e8c7b387e8c2fff1f552a04e3a2-LABS_n068_goal001.cnf"
+                  "./chosen-benchmarks/5a9ce84a8725164c40c90d2eb420bad9-sted5_0x0_n90-157.cnf"
+                  "./chosen-benchmarks/5c34b6844ed6a3fc57dccfc414af2851-SC21_Timetable_C_136_E_36_Cl_9_S_15.cnf"
                   ))
-  (for/and ([path (in-list paths)]
+  (for ([path (in-list paths)]
             [idx (in-naturals)])
     (displayln (format "--- START Test ~a ---" idx))
 
-    (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
-      (with-deep-time-limit timeout (time (solver (file->cnf path)))))))
+    (time (with-handlers ([exn:fail? (λ (e) (displayln "Timed out! Ending early...") #f)])
+      (with-deep-time-limit timeout (solver (file->cnf path)))))))
 
 
 (define (gen-random-case seed nclauses csize)
@@ -166,4 +190,7 @@
            #:repeat 5
            #:render render
            #:use-errortrace? #t))
-;(run-profiler)
+(run-profiler)
+;(define tests (for/list ([path (in-list profiling-paths)])  (file->cnf path)))
+#;(for ([test (in-list tests)])
+             (dpll test))
