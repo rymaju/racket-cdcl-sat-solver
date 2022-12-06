@@ -14,7 +14,10 @@
   (cond [found-contradiction #f] ;; this is a conflict arising before any simplification even starts
         [else
 
-         (define assignment (set->list assignment-set))
+         (define assignment
+           (for/fold ([a (empty-assignment)])
+                     ([lit (in-set assignment-set)])
+             (extend-assignment a lit)))
          (define unused-vars (list->set (hash-keys watched-literals)))
 
          ;; (displayln cnf0)
@@ -27,7 +30,7 @@
   (define-values (found-empty-clause watched-literals+ assignment unused-vars+)
     (if (cons? assignment0)
         (simplify* cnf (car assignment0) watched-literals assignment0 unused-vars)
-        (values #f watched-literals '() unused-vars)))
+        (values #f watched-literals assignment0 unused-vars)))
 
   (cond [found-empty-clause #f]
         [(set-empty? unused-vars) #t]
@@ -39,12 +42,15 @@
   (define-values (found-empty-clause watched-literals+ unit-literals)
     (simplify cnf (car assignment) watched-literals assignment))
   (define deduced-assignments+ (append unit-literals deduced-assignments))
-  (define unused-vars+ (set-subtract  unused-vars (list->set unit-literals)))
+  (define unused-vars+
+    (foldl (λ (x y) (set-remove y x))
+           unused-vars
+           unit-literals))
 
   (if (or found-empty-clause (empty? deduced-assignments+))
       (values found-empty-clause watched-literals+ assignment unused-vars+)
       (let
-        ([assignment+ (cons (first deduced-assignments) assignment)])
+        ([assignment+ (extend-assignment assignment (first deduced-assignments))])
           (simplify* cnf (first deduced-assignments) watched-literals
                      assignment+ (rest deduced-assignments)))))
 
@@ -185,7 +191,7 @@
 (define (literal-value lit assignment)
   (for/fold ([value 'undefined])
             ([assigned-lit (in-list assignment)]
-             #:final (equal? (literal-symbol assigned-lit)
+             #:final (eqv? (literal-symbol assigned-lit)
                              (literal-symbol lit)))
     (literal-phase assigned-lit)))
 (module+ test

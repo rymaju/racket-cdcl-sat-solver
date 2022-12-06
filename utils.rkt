@@ -16,12 +16,12 @@
   (check-equal? (negate-literal (literal 'var-1 #t))
                 (literal 'var-1 #f)))
 
-
-(define (empty-assignment) empty)
+;(struct assignment () #:transparent)
+(define (empty-assignment) (hash))
 (define (extend-assignment a lit)
-  (cons lit a))
+  (hash-set a (literal-symbol lit) (literal-phase lit)))
 (define (assignment-size a)
-  (length a))
+  (hash-count a))
 
 (define (literal-positive var)
   (literal var #t))
